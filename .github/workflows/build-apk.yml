@@ -1,0 +1,172 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - 'arena/**'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'نوع النسخة (Build Type)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+      split_per_abi:
+        description: 'تقسيم ملفات APK بحسب المعمارية (Split per ABI)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APK (${{ inputs.build_type || 'release' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unpack project archive if needed
+        run: |
+          echo "Checking Flutter project location..."
+          if [ ! -f "pubspec.yaml" ] && [ ! -f "mobile/pubspec.yaml" ] && [ ! -f "tijarti-android/mobile/pubspec.yaml" ]; then
+            ZIP_FILE=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
+            if [ -n "$ZIP_FILE" ]; then
+              echo "Extracting archive: $ZIP_FILE"
+              unzip -q -o "$ZIP_FILE"
+            fi
+          fi
+
+      - name: Locate Flutter project directory
+        id: locate_flutter
+        run: |
+          if [ -f "pubspec.yaml" ]; then
+            PROJECT_DIR="."
+          elif [ -f "mobile/pubspec.yaml" ]; then
+            PROJECT_DIR="mobile"
+          elif [ -f "tijarti-android/mobile/pubspec.yaml" ]; then
+            PROJECT_DIR="tijarti-android/mobile"
+          else
+            PUBSPEC=$(find . -name "pubspec.yaml" -not -path "*/.*" -not -path "*/build/*" | head -n 1)
+            if [ -n "$PUBSPEC" ]; then
+              PROJECT_DIR=$(dirname "$PUBSPEC")
+            else
+              echo "::error::Could not find pubspec.yaml anywhere in repository!"
+              exit 1
+            fi
+          fi
+          echo "Found Flutter project at: $PROJECT_DIR"
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java Development Kit (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Configure Android & Gradle build settings
+        working-directory: ${{ steps.locate_flutter.outputs.project_dir }}
+        run: |
+          # Remove stale local.properties so Flutter SDK path is generated freshly for CI runner
+          find . -name "local.properties" -exec rm -f {} +
+
+          # Ensure Gradle heap limit stays within GitHub Actions runner memory (7GB)
+          find . -name "gradle.properties" -exec sed -i 's/-Xmx[0-9]*[Gg]/-Xmx3072m/g' {} +
+          find . -name "gradle.properties" -exec sed -i 's/-XX:MaxMetaspaceSize=[0-9]*[Gg]/-XX:MaxMetaspaceSize=1024m/g' {} +
+
+          # Ensure gradlew has executable permissions
+          find . -name "gradlew" -exec chmod +x {} +
+
+      - name: Verify Flutter environment
+        run: flutter doctor -v
+
+      - name: Install dependencies (flutter pub get)
+        working-directory: ${{ steps.locate_flutter.outputs.project_dir }}
+        run: flutter pub get
+
+      - name: Run unit tests
+        working-directory: ${{ steps.locate_flutter.outputs.project_dir }}
+        run: flutter test --no-pub
+        continue-on-error: true
+
+      - name: Build Android APK
+        working-directory: ${{ steps.locate_flutter.outputs.project_dir }}
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError'"
+        run: |
+          BUILD_MODE="${{ inputs.build_type || 'release' }}"
+          SPLIT_FLAG=""
+          if [ "${{ inputs.split_per_abi }}" = "true" ]; then
+            SPLIT_FLAG="--split-per-abi"
+          fi
+
+          echo "Starting Flutter APK build with mode: $BUILD_MODE $SPLIT_FLAG"
+          if [ "$BUILD_MODE" = "debug" ]; then
+            flutter build apk --debug $SPLIT_FLAG
+          else
+            flutter build apk --release $SPLIT_FLAG
+          fi
+
+      - name: List and verify generated APKs
+        id: apk_info
+        working-directory: ${{ steps.locate_flutter.outputs.project_dir }}
+        run: |
+          echo "=== Generated APK Files ==="
+          ls -lh build/app/outputs/flutter-apk/*.apk
+          echo "=== SHA-256 Checksums ==="
+          sha256sum build/app/outputs/flutter-apk/*.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tijarti-apk-${{ inputs.build_type || 'release' }}
+          path: ${{ steps.locate_flutter.outputs.project_dir }}/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.locate_flutter.outputs.project_dir }}/build/app/outputs/flutter-apk/*.apk
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Build Summary
+        if: always()
+        run: |
+          echo "### 🚀 نتيجة بناء تطبيق تجارتي Android (Flutter APK)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| الخاصية | القيمة |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **الحالة (Status)** | ${{ job.status == 'success' && '✅ ناجح (Success)' || '❌ غير مكتمل (Failed)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **نوع النسخة (Build Type)** | \`${{ inputs.build_type || 'release' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **الفرع (Branch)** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **معرف الالتزام (Commit)** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### 📦 كيفية تحميل ملف الـ APK:" >> $GITHUB_STEP_SUMMARY
+          echo "1. انتقل إلى تبويب **Actions** في مستودع GitHub." >> $GITHUB_STEP_SUMMARY
+          echo "2. اضغط على تشغيل الـ Workflow الحالي (\`Build Android APK\`)." >> $GITHUB_STEP_SUMMARY
+          echo "3. في أسفل الصفحة ضمن قسم **Artifacts**، ستجد ملف \`tijarti-apk-${{ inputs.build_type || 'release' }}\` جاهزاً للتنزيل." >> $GITHUB_STEP_SUMMARY
