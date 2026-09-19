@@ -86,6 +86,13 @@ jobs:
               cp -rf tijarti-android/mobile/.[!.]* mobile/ 2>/dev/null || true
               rm -rf tijarti-android
             fi
+
+            # تنظيف ملفات التبعيات المحلية المولدة مسبقاً لمنع تعارض المسارات في بيئة الـ CI
+            find . -name ".flutter-plugins*" -exec rm -f {} +
+            find . -name "local.properties" -exec rm -f {} +
+            find . -name "GeneratedPluginRegistrant.java" -exec rm -f {} +
+            find . -name "*.iml" -exec rm -f {} +
+            rm -rf .dart_tool
           else
             echo "ℹ️ لم يتم العثور على ملفات zip، سيتم البناء من ملفات المستودع مباشرة."
             echo "selected_zip=source-repo" >> "$GITHUB_OUTPUT"
@@ -128,9 +135,11 @@ jobs:
       - name: Configure Android & Gradle build settings
         working-directory: ${{ steps.locate_flutter.outputs.project_dir }}
         run: |
-          # Remove stale local.properties so Flutter SDK path is generated freshly for CI runner
+          # Remove stale local-machine generated files
+          rm -f .flutter-plugins .flutter-plugins-dependencies
           find . -name "local.properties" -exec rm -f {} +
-          rm -f local.properties android/local.properties
+          find . -name ".flutter-plugins*" -exec rm -f {} +
+          find . -name "GeneratedPluginRegistrant.java" -exec rm -f {} +
 
           # Ensure Gradle heap limit stays within GitHub Actions runner memory (7GB)
           find . -name "gradle.properties" -exec sed -i 's/-Xmx[0-9]*[Gg]/-Xmx3072m/g' {} +
@@ -180,17 +189,24 @@ jobs:
 
           echo "Starting Flutter APK build with mode: $BUILD_MODE $SPLIT_FLAG"
           set -o pipefail
-          BUILD_CMD="flutter build apk --$BUILD_MODE $SPLIT_FLAG -v"
+          BUILD_CMD="flutter build apk --$BUILD_MODE $SPLIT_FLAG"
           echo "Running build command: $BUILD_CMD"
           if ! $BUILD_CMD 2>&1 | tee /tmp/flutter_build.log; then
             echo "### ❌ سجل خطأ بناء الـ APK:" >> $GITHUB_STEP_SUMMARY
             echo '```text' >> $GITHUB_STEP_SUMMARY
-            tail -n 120 /tmp/flutter_build.log >> $GITHUB_STEP_SUMMARY
+            grep -B 2 -A 40 "What went wrong:" /tmp/flutter_build.log >> $GITHUB_STEP_SUMMARY || true
+            grep -B 2 -A 25 "FAILURE:" /tmp/flutter_build.log >> $GITHUB_STEP_SUMMARY || true
+            grep -E "e: |Error: |Exception: " /tmp/flutter_build.log | head -n 30 >> $GITHUB_STEP_SUMMARY || true
             echo '```' >> $GITHUB_STEP_SUMMARY
 
-            echo "### Flutter Build Failure Log" > /tmp/comment.txt
+            echo "### Flutter Build Failure Reason" > /tmp/comment.txt
             echo '```text' >> /tmp/comment.txt
-            tail -n 120 /tmp/flutter_build.log >> /tmp/comment.txt
+            grep -B 2 -A 40 "What went wrong:" /tmp/flutter_build.log >> /tmp/comment.txt || true
+            grep -B 2 -A 25 "FAILURE:" /tmp/flutter_build.log >> /tmp/comment.txt || true
+            grep -E "e: |Error: |Exception: " /tmp/flutter_build.log | head -n 30 >> /tmp/comment.txt || true
+            if [ ! -s /tmp/comment.txt ]; then
+              tail -n 80 /tmp/flutter_build.log >> /tmp/comment.txt
+            fi
             echo '```' >> /tmp/comment.txt
             gh api repos/${{ github.repository }}/issues/1/comments -f body="$(cat /tmp/comment.txt)" || true
             exit 1
