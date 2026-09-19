@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       target_archive:
-        description: 'تحديد أرشيف النسخة (مثال: 19 أو latest لاختيار أحدث ملف zip تلقائياً)'
+        description: 'تحديد أرشيف النسخة (مثال: 20 أو 19 أو latest لاختيار أحدث ملف zip تلقائياً)'
         required: false
         default: 'latest'
         type: string
@@ -93,6 +93,10 @@ jobs:
             find . -name "GeneratedPluginRegistrant.java" -exec rm -f {} +
             find . -name "*.iml" -exec rm -f {} +
             rm -rf .dart_tool
+
+            # تصحيح تلقائي لصياغة المعامل الشرطي الثلاثي مع الفهرس الشرطي
+            find . -name "store_banner_management_page.dart" -exec sed -i "s/_type == 'product' ? _selectedTarget?\['entity_public_id'\] : null/_type == 'product' ? (_selectedTarget?\['entity_public_id'\]) : null/g" {} +
+            find . -name "store_banner_management_page.dart" -exec sed -i "s/_type == 'store' ? _selectedTarget?\['entity_public_id'\] : null/_type == 'store' ? (_selectedTarget?\['entity_public_id'\]) : null/g" {} +
           else
             echo "ℹ️ لم يتم العثور على ملفات zip، سيتم البناء من ملفات المستودع مباشرة."
             echo "selected_zip=source-repo" >> "$GITHUB_OUTPUT"

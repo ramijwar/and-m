@@ -5,6 +5,7 @@ import '../../catalog/presentation/catalog_detail_pages.dart';
 import '../../catalog/presentation/marketplace_activity_page.dart';
 import '../../commerce/presentation/orders_page.dart';
 import '../../workspace/presentation/admin_activity_page.dart';
+import '../../workspace/presentation/admin_commerce_page.dart';
 import '../../workspace/presentation/admin_dashboard_page.dart';
 import '../../workspace/presentation/admin_delivery_page.dart';
 import '../../workspace/presentation/admin_notification_campaign_page.dart';
@@ -43,6 +44,7 @@ Future<bool> openNotificationTarget(
       'merchant_notification_campaign' => const AdminActivityPage(
         initialTabIndex: 2,
       ),
+      'order' => const AdminCommercePage(),
       'admin_notification_campaign' => const AdminNotificationCampaignPage(),
       'delivery_task' => const AdminDeliveryPage(),
       _ => null,

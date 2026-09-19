@@ -25,7 +25,6 @@ final class _AdminNotificationCampaignPageState
   String _category = 'system';
   bool _includeAdmins = true;
   String _targetType = 'none';
-  Map<String, dynamic>? _targetStore;
   Map<String, dynamic>? _target;
   bool _sending = false;
   bool _loaded = false;
@@ -244,7 +243,6 @@ final class _AdminNotificationCampaignPageState
     required String type,
     required String title,
     required String hint,
-    String storeId = '',
   }) => showModalBottomSheet<Map<String, dynamic>>(
     context: context,
     isScrollControlled: true,
@@ -252,50 +250,25 @@ final class _AdminNotificationCampaignPageState
       type: type,
       title: title,
       hint: hint,
-      storeId: storeId,
     ),
   );
 
-  Future<void> _chooseStore() async {
-    final store = await _searchDestination(
-      type: 'store',
-      title: 'اختيار متجر',
-      hint: 'اسم المتجر أو اسم التاجر',
-    );
-    if (store == null || !mounted) return;
-    setState(() {
-      _targetStore = store;
-      _target = _targetType == 'store' ? store : null;
-    });
-  }
-
   Future<void> _chooseDestination() async {
-    if (_targetType == 'product' && _targetStore == null) {
-      await _chooseStore();
-      return;
-    }
     final config = switch (_targetType) {
-      'store' => ('store', 'اختيار متجر', 'اسم المتجر أو اسم التاجر', ''),
-      'product' => (
-        'product',
-        'اختيار منتج',
-        'اسم المنتج أو SKU',
-        _targetStore?['entity_public_id'] as String? ?? '',
-      ),
+      'store' => ('store', 'اختيار متجر', 'اسم المتجر أو اسم التاجر'),
+      'product' => ('product', 'اختيار منتج', 'اسم المنتج أو SKU أو اسم المتجر'),
       'marketplace_listing' => (
         'marketplace_listing',
         'اختيار إعلان حراج',
         'عنوان الإعلان أو المدينة أو المنطقة',
-        '',
       ),
-      _ => ('', '', '', ''),
+      _ => ('', '', ''),
     };
     if (config.$1.isEmpty) return;
     final item = await _searchDestination(
       type: config.$1,
       title: config.$2,
       hint: config.$3,
-      storeId: config.$4,
     );
     if (item == null || !mounted) return;
     setState(() => _target = item);
@@ -333,7 +306,6 @@ final class _AdminNotificationCampaignPageState
         _mode = 'all';
         _includeAdmins = true;
         _targetType = 'none';
-        _targetStore = null;
         _target = null;
         _history = AppScope.of(context).loadAdminNotificationCampaigns();
       });
@@ -357,7 +329,7 @@ final class _AdminNotificationCampaignPageState
         items: const [
           DropdownMenuItem(value: 'none', child: Text('بدون وجهة مباشرة')),
           DropdownMenuItem(value: 'store', child: Text('متجر محدد')),
-          DropdownMenuItem(value: 'product', child: Text('منتج ضمن متجر')),
+          DropdownMenuItem(value: 'product', child: Text('منتج محدد')),
           DropdownMenuItem(
             value: 'marketplace_listing',
             child: Text('إعلان حراج محدد'),
@@ -365,57 +337,31 @@ final class _AdminNotificationCampaignPageState
         ],
         onChanged: (value) => setState(() {
           _targetType = value ?? 'none';
-          _targetStore = null;
           _target = null;
         }),
       ),
       if (_targetType != 'none') ...[
         const SizedBox(height: 10),
         const Text(
-          'تظهر هنا العناصر المتاحة للمستخدمين فقط؛ البحث فوري ومحدود النتائج.',
+          'اختر من القائمة؛ البحث فوري ولا يحتاج إلى إدخال أي معرف. اختيار المنتج يربط متجره تلقائياً.',
           style: TextStyle(fontSize: 12),
         ),
         const SizedBox(height: 8),
-        if (_targetType == 'product' && _targetStore == null)
-          OutlinedButton.icon(
-            onPressed: _chooseStore,
-            icon: const Icon(Icons.storefront_outlined),
-            label: const Text('1. بحث واختيار متجر'),
+        OutlinedButton.icon(
+          onPressed: _chooseDestination,
+          icon: Icon(
+            _targetType == 'marketplace_listing'
+                ? Icons.storefront_outlined
+                : _targetType == 'product'
+                    ? Icons.inventory_2_outlined
+                    : Icons.storefront_outlined,
           ),
-        if (_targetType == 'product' && _targetStore != null)
-          Card(
-            color: Theme.of(context).colorScheme.secondaryContainer,
-            child: ListTile(
-              leading: const Icon(Icons.storefront_outlined),
-              title: Text(_targetStore?['label'] as String? ?? 'متجر'),
-              subtitle: Text(_targetStore?['subtitle'] as String? ?? ''),
-              trailing: TextButton(
-                onPressed: () => setState(() {
-                  _targetStore = null;
-                  _target = null;
-                }),
-                child: const Text('تغيير'),
-              ),
-            ),
+          label: Text(
+            _target == null
+                ? 'بحث واختيار ${_destinationType(_targetType)}'
+                : 'تغيير ${_destinationType(_targetType)}',
           ),
-        if (_targetType != 'product' || _targetStore != null)
-          OutlinedButton.icon(
-            onPressed: _chooseDestination,
-            icon: Icon(
-              _targetType == 'marketplace_listing'
-                  ? Icons.storefront_outlined
-                  : _targetType == 'product'
-                  ? Icons.inventory_2_outlined
-                  : Icons.search_rounded,
-            ),
-            label: Text(
-              _target == null
-                  ? (_targetType == 'product'
-                        ? '2. بحث واختيار منتج'
-                        : 'بحث واختيار ${_destinationType(_targetType)}')
-                  : 'تغيير ${_destinationType(_targetType)}',
-            ),
-          ),
+        ),
         if (_target != null)
           Card(
             color: Theme.of(context).colorScheme.secondaryContainer,
@@ -424,8 +370,8 @@ final class _AdminNotificationCampaignPageState
                 _targetType == 'store'
                     ? Icons.storefront_outlined
                     : _targetType == 'product'
-                    ? Icons.inventory_2_outlined
-                    : Icons.campaign_outlined,
+                        ? Icons.inventory_2_outlined
+                        : Icons.campaign_outlined,
               ),
               title: Text(_target?['label'] as String? ?? 'عنصر'),
               subtitle: Text(_target?['subtitle'] as String? ?? ''),
@@ -711,12 +657,10 @@ final class _CampaignTargetSearchSheet extends StatefulWidget {
     required this.type,
     required this.title,
     required this.hint,
-    required this.storeId,
   });
   final String type;
   final String title;
   final String hint;
-  final String storeId;
   @override
   State<_CampaignTargetSearchSheet> createState() =>
       _CampaignTargetSearchSheetState();
@@ -731,6 +675,13 @@ final class _CampaignTargetSearchSheetState
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    // Show a bounded, recent list immediately; text only filters that list.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load(''));
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _input.dispose();
@@ -739,48 +690,43 @@ final class _CampaignTargetSearchSheetState
 
   void _onChanged(String value) {
     _debounce?.cancel();
-    if (value.trim().length < 2) {
-      setState(() {
-        _items = const [];
-        _loading = false;
-        _error = null;
-      });
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 240), () async {
-      if (!mounted) return;
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-      try {
-        final rows = await AppScope.of(context)
-            .searchAdminNotificationCampaignTargets(
-              type: widget.type,
-              search: value,
-              storeId: widget.storeId,
-            );
-        if (mounted && _input.text.trim() == value.trim())
-          setState(() {
-            _items = rows;
-            _loading = false;
-          });
-      } on ApiException catch (error) {
-        if (mounted)
-          setState(() {
-            _items = const [];
-            _loading = false;
-            _error = error.message;
-          });
-      } catch (_) {
-        if (mounted)
-          setState(() {
-            _items = const [];
-            _loading = false;
-            _error = 'تعذر البحث حالياً.';
-          });
-      }
+    _debounce = Timer(const Duration(milliseconds: 240), () => _load(value));
+  }
+
+  Future<void> _load(String value) async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
     });
+    try {
+      final rows = await AppScope.of(context).searchAdminNotificationCampaignTargets(
+        type: widget.type,
+        search: value.trim(),
+      );
+      if (mounted && _input.text.trim() == value.trim()) {
+        setState(() {
+          _items = rows;
+          _loading = false;
+        });
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        setState(() {
+          _items = const [];
+          _loading = false;
+          _error = error.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _items = const [];
+          _loading = false;
+          _error = 'تعذر البحث حالياً.';
+        });
+      }
+    }
   }
 
   IconData get _icon => switch (widget.type) {
@@ -825,10 +771,6 @@ final class _CampaignTargetSearchSheetState
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
                   ? Center(child: Text(_error!))
-                  : _input.text.trim().length < 2
-                  ? const Center(
-                      child: Text('اكتب حرفين على الأقل لبدء البحث الفوري.'),
-                    )
                   : _items.isEmpty
                   ? const Center(child: Text('لا توجد عناصر عامة مطابقة.'))
                   : ListView.separated(
