@@ -405,9 +405,9 @@ final class _BannerEditorState extends State<_BannerEditor> {
           'is_active': _active,
           'destination_type': _type,
           'destination_product_public_id':
-              _type == 'product' ? _selectedTarget?['entity_public_id'] : null,
+              _type == 'product' ? (_selectedTarget?['entity_public_id']) : null,
           'destination_store_public_id':
-              _type == 'store' ? _selectedTarget?['entity_public_id'] : null,
+              _type == 'store' ? (_selectedTarget?['entity_public_id']) : null,
           'external_url': _type == 'external' ? _url.text.trim() : null,
           'destination_phone':
               _type == 'phone' || _type == 'whatsapp' ? _phone.text.trim() : null,
