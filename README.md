@@ -6,16 +6,26 @@
 
 ## 🚀 البناء التلقائي لملف APK عبر GitHub Actions Workflow
 
-تم إعداد Workflow مخصص في المسار `.github/workflows/build-apk.yml` لبناء ملف الـ **APK** تلقائياً عبر GitHub Actions.
+تم إعداد وتطوير سير عمل (Workflow) ذكي في المسار `.github/workflows/build-apk.yml` لبناء ملف الـ **APK** تلقائياً عبر GitHub Actions.
+
+### 🌟 الميزة الذكية لاختيار النسخ (Multi-version Archive Support):
+- يكتشف الـ Workflow تلقائياً جميع ملفات الأرشيف المضغوطة (`*.zip`) في المستودع مثل:
+  - `tijarti-android-20260917.zip`
+  - `tijarti-android-20260919.zip`
+- يقوم **تلقائياً باختيار أحدث نسخة** (الأحدث تاريخاً أو رقماً) لبنائها دون الحاجة لأي تعديل يدوي.
+- يتيح لك عند التشغيل اليدوي تحديد أي نسخة تريد بناءها بدقة (مثلاً كتابة `19` أو `20260919`).
+
+---
 
 ### ⚙️ متى يتم تشغيل الـ Workflow؟
-1. **تلقائياً عند الدفع (Push):** عند إرسال أي تغييرات لفرع `main` أو فروع العمل `arena/**`.
-2. **عند طلبات السحب (Pull Requests):** لاختبار وضمان سلامة البناء قبل الدمج في `main`.
+1. **تلقائياً عند الدفع (Push):** عند رفع أي نسخة جديدة أو إرسال تغييرات لفرع `main` أو فروع العمل `arena/**`.
+2. **عند طلبات السحب (Pull Requests):** للتحقق من سلامة البناء قبل الدمج.
 3. **يدوياً من خلال GitHub (Manual Run):**
    - افتح تبويب **Actions** في مستودع GitHub.
    - اختر **Build Android APK** من القائمة اليسرى.
    - اضغط على **Run workflow**.
-   - يمكنك تحديد خيارات البناء:
+   - خيارات البناء المتاحة:
+     - **تحديد أرشيف النسخة (target_archive):** اتركه `latest` لاختيار أحدث نسخة تلقائياً، أو اكتب رقماً أو لاحقة مثل `19` لاختيار ملف معين.
      - **نوع النسخة (Build Type):** `release` (افتراضي) أو `debug`.
      - **تقسيم بحسب المعمارية (Split per ABI):** تفعيل أو تعطيل.
 4. **تلقائياً عند إنشاء Release Tag:** عند إطلاق وسم يبدأ بـ `v*` (مثل `v1.0.0`)، يتم إنشاء Release رسمي على GitHub وإرفاق ملفات الـ APK تلقائياً.
@@ -27,17 +37,16 @@
 1. ادخل إلى تبويب **Actions** في المستودع.
 2. اضغط على أحدث تشغيل للـ Workflow (Run).
 3. انزل لأسفل الصفحة إلى قسم **Artifacts**.
-4. اضغط على **`tijarti-apk-release`** (أو `tijarti-apk-debug`) لتنزيل ملف الـ APK بصيغة مضغوطة وفك الضغط لتثبيته مباشرة على جهاز الأندرويد.
+4. اضغط على **`tijarti-apk-20260919-release`** لتنزيل ملف الـ APK المخصص للإصدار الأخير.
 
 ---
 
 ## 🛠️ تفاصيل بيئة البناء في الـ Workflow
 
-- **نظام التشغيل:** Ubuntu Latest (GitHub-hosted runner).
-- **إصدار Java:** JDK 17 (Eclipse Temurin).
-- **محرك وإطار العمل:** Flutter SDK (Stable Channel).
-- **التوافق:** يكتشف الـ Workflow مسار المشروع تلقائياً سواء كان في المجلد الرئيسي أو داخل مجلد `mobile/` أو مستخرجاً من أرشيف zip.
-- **إدارة الذاكرة:** يضبط حجم ذاكرة Gradle بما يتوافق مع بيئة GitHub Actions (3GB heap) لتفادي أخطاء الذاكرة (Out of Memory).
+- **نظام التشغيل:** Ubuntu Latest.
+- **إصدار Java:** JDK 17 (Eclipse Temurin via setup-java@v5).
+- **إطار العمل:** Flutter SDK (Stable Channel).
+- **إدارة الذاكرة:** ضبط ذاكرة Gradle تلقائياً (`3GB heap`) لتفادي أخطاء الذاكرة (OOM).
 
 ---
 
@@ -50,17 +59,9 @@ cd mobile
 # تنزيل حزم ومكتبات فلاتر
 flutter pub get
 
-# فحص جودة الكود
-flutter analyze
-
 # تشغيل الاختبارات
 flutter test
 
 # بناء APK للإنتاج محلياً
 flutter build apk --release
-```
-
-لتحديد رابط API مختلف عند التشغيل:
-```bash
-flutter run --dart-define=API_BASE_URL=https://example.com/s_api/api/v1
 ```

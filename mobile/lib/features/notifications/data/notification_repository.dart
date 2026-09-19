@@ -8,6 +8,7 @@ final class AppNotification {
     required this.body,
     required this.readAt,
     required this.createdAt,
+    this.isMandatoryInApp = false,
     this.entityType,
     this.entityPublicId,
   });
@@ -18,20 +19,26 @@ final class AppNotification {
   final String body;
   final String? readAt;
   final String? createdAt;
+  final bool isMandatoryInApp;
   final String? entityType;
   final String? entityPublicId;
   bool get isRead => readAt != null;
 
-  factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
-    publicId: json['public_id'] as String? ?? '',
-    category: json['category'] as String? ?? 'general',
-    title: json['title'] as String? ?? 'تحديث جديد',
-    body: json['body'] as String? ?? '',
-    readAt: json['read_at'] as String?,
-    createdAt: json['created_at'] as String?,
-    entityType: json['entity_type'] as String?,
-    entityPublicId: json['entity_public_id'] as String?,
-  );
+  factory AppNotification.fromJson(Map<String, dynamic> json) =>
+      AppNotification(
+        publicId: json['public_id'] as String? ?? '',
+        category: json['category'] as String? ?? 'general',
+        title: json['title'] as String? ?? 'تحديث جديد',
+        body: json['body'] as String? ?? '',
+        readAt: json['read_at'] as String?,
+        createdAt: json['created_at'] as String?,
+        isMandatoryInApp:
+            json['is_mandatory_in_app'] == true ||
+            json['is_mandatory_in_app'] == 1 ||
+            json['is_mandatory_in_app'] == '1',
+        entityType: json['entity_type'] as String?,
+        entityPublicId: json['entity_public_id'] as String?,
+      );
 }
 
 final class NotificationFeed {
@@ -41,20 +48,34 @@ final class NotificationFeed {
 }
 
 final class NotificationPreference {
-  const NotificationPreference({required this.category, required this.inAppEnabled, required this.pushEnabled});
+  const NotificationPreference({
+    required this.category,
+    required this.inAppEnabled,
+    required this.pushEnabled,
+  });
   final String category;
   final bool inAppEnabled;
   final bool pushEnabled;
 
-  factory NotificationPreference.fromJson(Map<String, dynamic> json) => NotificationPreference(
-    category: json['category'] as String? ?? 'system',
-    inAppEnabled: json['in_app_enabled'] == true,
-    pushEnabled: json['push_enabled'] == true,
-  );
+  factory NotificationPreference.fromJson(Map<String, dynamic> json) =>
+      NotificationPreference(
+        category: json['category'] as String? ?? 'system',
+        inAppEnabled: json['in_app_enabled'] == true,
+        pushEnabled: json['push_enabled'] == true,
+      );
 
-  Map<String, dynamic> toJson() => {'category': category, 'in_app_enabled': inAppEnabled, 'push_enabled': pushEnabled};
+  Map<String, dynamic> toJson() => {
+    'category': category,
+    'in_app_enabled': inAppEnabled,
+    'push_enabled': pushEnabled,
+  };
 
-  NotificationPreference copyWith({bool? inAppEnabled, bool? pushEnabled}) => NotificationPreference(category: category, inAppEnabled: inAppEnabled ?? this.inAppEnabled, pushEnabled: pushEnabled ?? this.pushEnabled);
+  NotificationPreference copyWith({bool? inAppEnabled, bool? pushEnabled}) =>
+      NotificationPreference(
+        category: category,
+        inAppEnabled: inAppEnabled ?? this.inAppEnabled,
+        pushEnabled: pushEnabled ?? this.pushEnabled,
+      );
 }
 
 final class NotificationRepository {
@@ -66,7 +87,9 @@ final class NotificationRepository {
     final raw = data['items'];
     final items = (raw is List ? raw : const [])
         .whereType<Map>()
-        .map((item) => AppNotification.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) => AppNotification.fromJson(Map<String, dynamic>.from(item)),
+        )
         .toList(growable: false);
     return NotificationFeed(
       items: items,
@@ -79,14 +102,22 @@ final class NotificationRepository {
     final raw = data['items'];
     return (raw is List ? raw : const [])
         .whereType<Map>()
-        .map((item) => NotificationPreference.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) =>
+              NotificationPreference.fromJson(Map<String, dynamic>.from(item)),
+        )
         .toList(growable: false);
   }
 
-  Future<void> updatePreferences(List<NotificationPreference> preferences) => _api.patch(
-    '/notifications/preferences',
-    body: {'preferences': preferences.map((item) => item.toJson()).toList(growable: false)},
-  );
+  Future<void> updatePreferences(List<NotificationPreference> preferences) =>
+      _api.patch(
+        '/notifications/preferences',
+        body: {
+          'preferences': preferences
+              .map((item) => item.toJson())
+              .toList(growable: false),
+        },
+      );
 
   Future<void> markRead(String publicId) =>
       _api.patch('/notifications/${Uri.encodeComponent(publicId)}/read');

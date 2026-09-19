@@ -12,6 +12,11 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      target_archive:
+        description: 'تحديد أرشيف النسخة (مثال: 19 أو latest لاختيار أحدث ملف zip تلقائياً)'
+        required: false
+        default: 'latest'
+        type: string
       build_type:
         description: 'نوع النسخة (Build Type)'
         required: true
@@ -39,15 +44,50 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Unpack project archive if needed
+      - name: Select and extract target Flutter project archive
+        id: select_archive
         run: |
-          echo "Checking Flutter project location..."
-          if [ ! -f "pubspec.yaml" ] && [ ! -f "mobile/pubspec.yaml" ] && [ ! -f "tijarti-android/mobile/pubspec.yaml" ]; then
-            ZIP_FILE=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
-            if [ -n "$ZIP_FILE" ]; then
-              echo "Extracting archive: $ZIP_FILE"
-              unzip -q -o "$ZIP_FILE"
+          echo "=== فحص ملفات الأرشيف المتاحة في المستودع ==="
+          ls -lh *.zip 2>/dev/null || true
+
+          TARGET_INPUT="${{ inputs.target_archive }}"
+          SELECTED_ZIP=""
+
+          # 1. إذا أدخل المستخدم خياراً محدداً (مثل 19 أو 20260919)
+          if [ -n "$TARGET_INPUT" ] && [ "$TARGET_INPUT" != "latest" ]; then
+            SELECTED_ZIP=$(find . -maxdepth 2 -name "*${TARGET_INPUT}*.zip" | sort -V | tail -n 1)
+          fi
+
+          # 2. إذا لم يحدد أو اختار latest، نختار تلقائياً أحدث ملف zip بحسب الترتيب الزمني
+          if [ -z "$SELECTED_ZIP" ]; then
+            SELECTED_ZIP=$(find . -maxdepth 2 -name "*.zip" | sort -V | tail -n 1)
+          fi
+
+          if [ -n "$SELECTED_ZIP" ]; then
+            ZIP_BASENAME=$(basename "$SELECTED_ZIP")
+            echo "✅ تم تحديد النسخة للبناء: $ZIP_BASENAME"
+
+            ARCHIVE_TAG=$(echo "$ZIP_BASENAME" | grep -o -E '[0-9]{8}' | head -n 1)
+            if [ -z "$ARCHIVE_TAG" ]; then
+              ARCHIVE_TAG=$(echo "$ZIP_BASENAME" | sed 's/\.zip$//')
             fi
+
+            echo "selected_zip=$ZIP_BASENAME" >> "$GITHUB_OUTPUT"
+            echo "archive_tag=$ARCHIVE_TAG" >> "$GITHUB_OUTPUT"
+
+            echo "جاري فك ضغط $SELECTED_ZIP وتحديث مجلد التطبيق..."
+            unzip -q -o "$SELECTED_ZIP"
+
+            if [ -d "tijarti-android/mobile" ]; then
+              mkdir -p mobile
+              cp -rf tijarti-android/mobile/* mobile/
+              cp -rf tijarti-android/mobile/.[!.]* mobile/ 2>/dev/null || true
+              rm -rf tijarti-android
+            fi
+          else
+            echo "ℹ️ لم يتم العثور على ملفات zip، سيتم البناء من ملفات المستودع مباشرة."
+            echo "selected_zip=source-repo" >> "$GITHUB_OUTPUT"
+            echo "archive_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Locate Flutter project directory
@@ -138,7 +178,7 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tijarti-apk-${{ inputs.build_type || 'release' }}
+          name: tijarti-apk-${{ steps.select_archive.outputs.archive_tag }}-${{ inputs.build_type || 'release' }}
           path: ${{ steps.locate_flutter.outputs.project_dir }}/build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -162,6 +202,7 @@ jobs:
           echo "| الخاصية | القيمة |" >> $GITHUB_STEP_SUMMARY
           echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
           echo "| **الحالة (Status)** | ${{ job.status == 'success' && '✅ ناجح (Success)' || '❌ غير مكتمل (Failed)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **النسخة المبنية (Built Archive)** | \`${{ steps.select_archive.outputs.selected_zip }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **نوع النسخة (Build Type)** | \`${{ inputs.build_type || 'release' }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **الفرع (Branch)** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **معرف الالتزام (Commit)** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
@@ -169,4 +210,4 @@ jobs:
           echo "#### 📦 كيفية تحميل ملف الـ APK:" >> $GITHUB_STEP_SUMMARY
           echo "1. انتقل إلى تبويب **Actions** في مستودع GitHub." >> $GITHUB_STEP_SUMMARY
           echo "2. اضغط على تشغيل الـ Workflow الحالي (\`Build Android APK\`)." >> $GITHUB_STEP_SUMMARY
-          echo "3. في أسفل الصفحة ضمن قسم **Artifacts**، ستجد ملف \`tijarti-apk-${{ inputs.build_type || 'release' }}\` جاهزاً للتنزيل." >> $GITHUB_STEP_SUMMARY
+          echo "3. في أسفل الصفحة ضمن قسم **Artifacts**، ستجد ملف \`tijarti-apk-${{ steps.select_archive.outputs.archive_tag }}-${{ inputs.build_type || 'release' }}\` جاهزاً للتنزيل." >> $GITHUB_STEP_SUMMARY

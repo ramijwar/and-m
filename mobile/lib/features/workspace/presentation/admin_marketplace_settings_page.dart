@@ -58,7 +58,8 @@ final class _AdminMarketplaceSettingsPageState
       final image = input.remove('_category_image');
       final optionText = (input.remove('_select_options') as String? ?? '');
       if (image is XFile) {
-        input['image_media_id'] = await AppScope.of(context).uploadAdminPublicMedia(image);
+        input['image_media_id'] = await AppScope.of(context)
+            .uploadAdminPublicMedia(image);
       }
       final options = optionText
           .split(',')
@@ -72,9 +73,11 @@ final class _AdminMarketplaceSettingsPageState
           options: options,
         );
       } else {
-        await AppScope.of(
-          context,
-        ).saveAdminMarketplaceEntity(type: type, publicId: publicId, body: input);
+        await AppScope.of(context).saveAdminMarketplaceEntity(
+          type: type,
+          publicId: publicId,
+          body: input,
+        );
       }
       if (mounted) {
         ScaffoldMessenger.of(
@@ -183,11 +186,22 @@ final class _AdminMarketplaceSettingsPageState
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final image = await ImageUploadPolicy.pick(ImageSource.gallery);
-                      if (image != null) setModalState(() => categoryImage = image);
+                      final image = await ImageUploadPolicy.pick(
+                        ImageSource.gallery,
+                      );
+                      if (image != null)
+                        setModalState(() => categoryImage = image);
                     },
-                    icon: Icon(categoryImage == null ? Icons.add_photo_alternate_outlined : Icons.check_circle_outline_rounded),
-                    label: Text(categoryImage == null ? 'إرفاق صورة القسم (اختياري)' : 'تم اختيار صورة القسم'),
+                    icon: Icon(
+                      categoryImage == null
+                          ? Icons.add_photo_alternate_outlined
+                          : Icons.check_circle_outline_rounded,
+                    ),
+                    label: Text(
+                      categoryImage == null
+                          ? 'إرفاق صورة القسم (اختياري)'
+                          : 'تم اختيار صورة القسم',
+                    ),
                   ),
                 ],
                 if (type == 'attribute') ...[
@@ -316,7 +330,8 @@ final class _AdminMarketplaceSettingsPageState
   @override
   Widget build(BuildContext context) => DefaultTabController(
     length: 4,
-    child: Scaffold(
+    child: AdminWorkspaceScaffold(
+      active: AdminDestination.marketplace,
       appBar: AppBar(
         title: const Text('إعدادات الحراج'),
         actions: [
@@ -332,16 +347,21 @@ final class _AdminMarketplaceSettingsPageState
           const TabBar(
             isScrollable: true,
             tabs: [
-            Tab(text: 'الأقسام'),
-            Tab(text: 'السمات'),
-            Tab(text: 'المواقع'),
-            Tab(text: 'الصفقات'),
+              Tab(text: 'الأقسام'),
+              Tab(text: 'السمات'),
+              Tab(text: 'المواقع'),
+              Tab(text: 'الصفقات'),
             ],
           ),
         ),
       ),
       body: TabBarView(
-        children: [_categoriesTab(), _attributesTab(), _locationsTab(), _transactionsTab()],
+        children: [
+          _categoriesTab(),
+          _attributesTab(),
+          _locationsTab(),
+          _transactionsTab(),
+        ],
       ),
     ),
   );
@@ -473,80 +493,213 @@ final class _AdminMarketplaceSettingsPageState
   Widget _transactionsTab() => FutureBuilder<List<Map<String, dynamic>>>(
     future: _transactions,
     builder: (context, snapshot) {
-      if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-      if (snapshot.hasError) return const Center(child: Text('تعذر تحميل صفقات الحراج.'));
+      if (snapshot.connectionState != ConnectionState.done)
+        return const Center(child: CircularProgressIndicator());
+      if (snapshot.hasError)
+        return const Center(child: Text('تعذر تحميل صفقات الحراج.'));
       final items = snapshot.data ?? const <Map<String, dynamic>>[];
       final term = _transactionSearch.trim().toLowerCase();
-      final visible = items.where((item) => (_transactionStatus.isEmpty || item['transaction_status'] == _transactionStatus) && (term.isEmpty || [item['public_id'], item['listing_title'], item['buyer_name'], item['seller_name'], item['transaction_status']].any((value) => '$value'.toLowerCase().contains(term)))).toList(growable: false);
-      return Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 6), child: Row(children: [
-          Expanded(child: TextField(onChanged: (value) => setState(() => _transactionSearch = value), decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'الإعلان أو الطرف أو معرف الصفقة'))),
-          const SizedBox(width: 8),
-          SizedBox(width: 145, child: DropdownButtonFormField<String>(value: _transactionStatus, isExpanded: true, decoration: const InputDecoration(labelText: 'الحالة'), items: const [DropdownMenuItem(value: '', child: Text('الكل')), DropdownMenuItem(value: 'reserved', child: Text('محجوزة')), DropdownMenuItem(value: 'disputed', child: Text('نزاع')), DropdownMenuItem(value: 'completed', child: Text('مكتملة')), DropdownMenuItem(value: 'cancelled', child: Text('ملغاة'))], onChanged: (value) => setState(() => _transactionStatus = value ?? ''))),
-        ])),
-        Expanded(child: visible.isEmpty ? Center(child: Text(items.isEmpty ? 'لا توجد صفقات حراج مسجلة.' : 'لا توجد صفقات مطابقة.')) : ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        itemCount: visible.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final item = visible[index];
-          final id = item['public_id'] as String? ?? '';
-          final image = item['listing_primary_media_public_id'] as String?;
-          return Card(
-            child: ListTile(
-              leading: image == null
-                  ? const CircleAvatar(child: Icon(Icons.handshake_outlined))
-                  : ClipRRect(borderRadius: BorderRadius.circular(22), child: SizedBox(width: 44, height: 44, child: CachedMediaImage(mediaPublicId: image))),
-              title: Text(item['listing_title'] as String? ?? 'صفقة حراج', style: const TextStyle(fontWeight: FontWeight.w900)),
-              subtitle: Text('${item['buyer_name'] ?? 'مشتري'} ← ${item['seller_name'] ?? 'بائع'}\n${item['agreed_amount'] ?? 0} ${item['currency_code'] ?? ''} · ${item['transaction_status'] ?? '—'}${item['delivery_task_status'] != null ? ' · توصيل: ${item['delivery_task_status']}' : ''}'),
-              isThreeLine: true,
-              trailing: const Icon(Icons.chevron_left_rounded),
-              onTap: id.isEmpty ? null : () => _showMarketplaceTransaction(id),
+      final visible = items
+          .where(
+            (item) =>
+                (_transactionStatus.isEmpty ||
+                    item['transaction_status'] == _transactionStatus) &&
+                (term.isEmpty ||
+                    [
+                      item['public_id'],
+                      item['listing_title'],
+                      item['buyer_name'],
+                      item['seller_name'],
+                      item['transaction_status'],
+                    ].any((value) => '$value'.toLowerCase().contains(term))),
+          )
+          .toList(growable: false);
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: (value) =>
+                        setState(() => _transactionSearch = value),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search_rounded),
+                      hintText: 'الإعلان أو الطرف أو معرف الصفقة',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 145,
+                  child: DropdownButtonFormField<String>(
+                    value: _transactionStatus,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'الحالة'),
+                    items: const [
+                      DropdownMenuItem(value: '', child: Text('الكل')),
+                      DropdownMenuItem(
+                        value: 'reserved',
+                        child: Text('محجوزة'),
+                      ),
+                      DropdownMenuItem(value: 'disputed', child: Text('نزاع')),
+                      DropdownMenuItem(
+                        value: 'completed',
+                        child: Text('مكتملة'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'cancelled',
+                        child: Text('ملغاة'),
+                      ),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => _transactionStatus = value ?? ''),
+                  ),
+                ),
+              ],
             ),
-          );
-        },
-      )),
-      ]);
+          ),
+          Expanded(
+            child: visible.isEmpty
+                ? Center(
+                    child: Text(
+                      items.isEmpty
+                          ? 'لا توجد صفقات حراج مسجلة.'
+                          : 'لا توجد صفقات مطابقة.',
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                    itemCount: visible.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final item = visible[index];
+                      final id = item['public_id'] as String? ?? '';
+                      final image =
+                          item['listing_primary_media_public_id'] as String?;
+                      return Card(
+                        child: ListTile(
+                          leading: image == null
+                              ? const CircleAvatar(
+                                  child: Icon(Icons.handshake_outlined),
+                                )
+                              : ClipRRect(
+                                  borderRadius: BorderRadius.circular(22),
+                                  child: SizedBox(
+                                    width: 44,
+                                    height: 44,
+                                    child: CachedMediaImage(
+                                      mediaPublicId: image,
+                                    ),
+                                  ),
+                                ),
+                          title: Text(
+                            item['listing_title'] as String? ?? 'صفقة حراج',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                          subtitle: Text(
+                            '${item['buyer_name'] ?? 'مشتري'} ← ${item['seller_name'] ?? 'بائع'}\n${item['agreed_amount'] ?? 0} ${item['currency_code'] ?? ''} · ${item['transaction_status'] ?? '—'}${item['delivery_task_status'] != null ? ' · توصيل: ${item['delivery_task_status']}' : ''}',
+                          ),
+                          isThreeLine: true,
+                          trailing: const Icon(Icons.chevron_left_rounded),
+                          onTap: id.isEmpty
+                              ? null
+                              : () => _showMarketplaceTransaction(id),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      );
     },
   );
 
   Future<void> _showMarketplaceTransaction(String id) async {
     try {
-      final data = await AppScope.of(context).loadAdminMarketplaceTransactionDetail(id);
+      final data = await AppScope.of(context)
+          .loadAdminMarketplaceTransactionDetail(id);
       if (!mounted) return;
-      final transaction = Map<String, dynamic>.from(data['transaction'] as Map? ?? const {});
-      final delivery = data['delivery'] is Map ? Map<String, dynamic>.from(data['delivery'] as Map) : null;
-      final dispute = data['dispute'] is Map ? Map<String, dynamic>.from(data['dispute'] as Map) : null;
-      final conversation = data['conversation'] is Map ? Map<String, dynamic>.from(data['conversation'] as Map) : null;
-      final messages = (data['messages'] as List? ?? const []).whereType<Map>().map((entry) => Map<String, dynamic>.from(entry)).toList(growable: false);
+      final transaction = Map<String, dynamic>.from(
+        data['transaction'] as Map? ?? const {},
+      );
+      final delivery = data['delivery'] is Map
+          ? Map<String, dynamic>.from(data['delivery'] as Map)
+          : null;
+      final dispute = data['dispute'] is Map
+          ? Map<String, dynamic>.from(data['dispute'] as Map)
+          : null;
+      final conversation = data['conversation'] is Map
+          ? Map<String, dynamic>.from(data['conversation'] as Map)
+          : null;
+      final messages = (data['messages'] as List? ?? const [])
+          .whereType<Map>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList(growable: false);
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        builder: (context) => SafeArea(child: DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: .76,
-          maxChildSize: .94,
-          builder: (context, controller) => ListView(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 30),
-            children: [
-              Center(child: Container(width: 44, height: 4, decoration: BoxDecoration(color: Theme.of(context).colorScheme.outlineVariant, borderRadius: BorderRadius.circular(8)))),
-              const SizedBox(height: 16),
-              Text('تفاصيل صفقة الحراج', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
-              _marketplaceDetailBlock('الصفقة والإعلان', transaction),
-              if (delivery != null) _marketplaceDetailBlock('التوصيل المرتبط', delivery),
-              if (dispute != null) _marketplaceDetailBlock('النزاع المرتبط', dispute),
-              if (conversation != null) _marketplaceDetailBlock('المحادثة المرتبطة', conversation),
-              if (messages.isNotEmpty) ...[
-                const SizedBox(height: 16), const Text('سجل المحادثة', style: TextStyle(fontWeight: FontWeight.w900)),
-                ...messages.map((message) => Card(child: ListTile(title: Text(message['sender_name'] as String? ?? 'مستخدم'), subtitle: Text('${message['body'] ?? ''}\n${message['created_at'] ?? ''}')))),
+        builder: (context) => SafeArea(
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: .76,
+            maxChildSize: .94,
+            builder: (context, controller) => ListView(
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 30),
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'تفاصيل صفقة الحراج',
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                _marketplaceDetailBlock('الصفقة والإعلان', transaction),
+                if (delivery != null)
+                  _marketplaceDetailBlock('التوصيل المرتبط', delivery),
+                if (dispute != null)
+                  _marketplaceDetailBlock('النزاع المرتبط', dispute),
+                if (conversation != null)
+                  _marketplaceDetailBlock('المحادثة المرتبطة', conversation),
+                if (messages.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'سجل المحادثة',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  ...messages.map(
+                    (message) => Card(
+                      child: ListTile(
+                        title: Text(
+                          message['sender_name'] as String? ?? 'مستخدم',
+                        ),
+                        subtitle: Text(
+                          '${message['body'] ?? ''}\n${message['created_at'] ?? ''}',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        )),
+        ),
       );
     } on ApiException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -707,18 +860,63 @@ final class _AdminMarketplaceSettingsPageState
 
 Widget _marketplaceDetailBlock(String title, Map<String, dynamic> values) {
   const labels = {
-    'public_id': 'المعرف', 'listing_public_id': 'معرف الإعلان', 'listing_title': 'الإعلان', 'listing_description': 'وصف الإعلان', 'listing_status': 'حالة الإعلان',
-    'buyer_name': 'المشتري', 'buyer_phone': 'هاتف المشتري', 'seller_name': 'البائع', 'seller_phone': 'هاتف البائع', 'agreed_amount': 'المبلغ المتفق عليه',
-    'currency_code': 'العملة', 'transaction_status': 'حالة الصفقة', 'offer_public_id': 'معرف العرض', 'offer_amount': 'قيمة العرض', 'offer_status': 'حالة العرض', 'offer_expires_at': 'انتهاء العرض',
-    'task_public_id': 'معرف المهمة', 'task_status': 'حالة المهمة', 'request_status': 'حالة طلب التوصيل', 'fee_amount': 'رسم التوصيل', 'distance_km': 'المسافة كم', 'courier_name': 'عامل التوصيل',
-    'reason_code': 'سبب النزاع', 'details': 'التفاصيل', 'resolution_note': 'قرار الإدارة', 'status': 'الحالة', 'opened_at': 'تاريخ الفتح', 'resolved_at': 'تاريخ الحسم', 'created_at': 'تاريخ الإنشاء', 'updated_at': 'آخر تحديث',
+    'public_id': 'المعرف',
+    'listing_public_id': 'معرف الإعلان',
+    'listing_title': 'الإعلان',
+    'listing_description': 'وصف الإعلان',
+    'listing_status': 'حالة الإعلان',
+    'buyer_name': 'المشتري',
+    'buyer_phone': 'هاتف المشتري',
+    'seller_name': 'البائع',
+    'seller_phone': 'هاتف البائع',
+    'agreed_amount': 'المبلغ المتفق عليه',
+    'currency_code': 'العملة',
+    'transaction_status': 'حالة الصفقة',
+    'offer_public_id': 'معرف العرض',
+    'offer_amount': 'قيمة العرض',
+    'offer_status': 'حالة العرض',
+    'offer_expires_at': 'انتهاء العرض',
+    'task_public_id': 'معرف المهمة',
+    'task_status': 'حالة المهمة',
+    'request_status': 'حالة طلب التوصيل',
+    'fee_amount': 'رسم التوصيل',
+    'distance_km': 'المسافة كم',
+    'courier_name': 'عامل التوصيل',
+    'reason_code': 'سبب النزاع',
+    'details': 'التفاصيل',
+    'resolution_note': 'قرار الإدارة',
+    'status': 'الحالة',
+    'opened_at': 'تاريخ الفتح',
+    'resolved_at': 'تاريخ الحسم',
+    'created_at': 'تاريخ الإنشاء',
+    'updated_at': 'آخر تحديث',
   };
-  final rows = values.entries.where((entry) => entry.value != null && entry.value is! Map && entry.value is! List && '${entry.value}'.trim().isNotEmpty).toList(growable: false);
+  final rows = values.entries
+      .where(
+        (entry) =>
+            entry.value != null &&
+            entry.value is! Map &&
+            entry.value is! List &&
+            '${entry.value}'.trim().isNotEmpty,
+      )
+      .toList(growable: false);
   if (rows.isEmpty) return const SizedBox.shrink();
-  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    const SizedBox(height: 16), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 6),
-    ...rows.map((entry) => Card(child: ListTile(title: Text(labels[entry.key] ?? entry.key), subtitle: SelectableText('${entry.value}')))),
-  ]);
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const SizedBox(height: 16),
+      Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+      const SizedBox(height: 6),
+      ...rows.map(
+        (entry) => Card(
+          child: ListTile(
+            title: Text(labels[entry.key] ?? entry.key),
+            subtitle: SelectableText('${entry.value}'),
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 final class _AsyncItems extends StatelessWidget {

@@ -222,6 +222,10 @@ final class _DiscoverTab extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
           _Hero(onExplore: onOpenMarketplace),
+          if (feed.banners.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            StoreBannerStrip(banners: feed.banners, title: 'تميّز معنا'),
+          ],
           if (feed.isStale) _OfflineNotice(lastSyncedAt: feed.lastSyncedAt),
           if (controller.homeError != null)
             _ErrorNotice(message: controller.homeError!),
@@ -302,9 +306,9 @@ final class _Hero extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
@@ -338,27 +342,22 @@ final class _Hero extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           const Text(
             'تسوّق محلياً،\nبطريقة أذكى.',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 30,
-              height: 1.18,
+              fontSize: 26,
+              height: 1.12,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'اكتشف متاجر وإعلانات موثوقة في تجربة عربية واضحة وسلسة.',
-            style: TextStyle(color: Color(0xFFE2F4ED), height: 1.55),
-          ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 16),
           FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: theme.colorScheme.primary,
-              minimumSize: const Size(0, 46),
+              minimumSize: const Size(0, 42),
             ),
             onPressed: onExplore,
             icon: const Icon(Icons.arrow_back_rounded),
@@ -407,6 +406,9 @@ final class _StoresTabState extends State<_StoresTab> {
     final stores = isCurrentMode
         ? controller.storeDirectory
         : const <StoreSummary>[];
+    final banners = isCurrentMode
+        ? controller.storeDirectoryBanners
+        : const <StoreBanner>[];
     return RefreshIndicator(
       onRefresh: () =>
           controller.loadStoreDirectory(mode: widget.mode, force: true),
@@ -414,6 +416,10 @@ final class _StoresTabState extends State<_StoresTab> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
+          if (banners.isNotEmpty) ...[
+            StoreBannerStrip(banners: banners, title: 'تميّز معنا'),
+            const SizedBox(height: 24),
+          ],
           const _SectionHeader(
             title: 'المتاجر',
             subtitle: 'كل المتاجر المحلية النشطة مرتبة حسب الزيارات',

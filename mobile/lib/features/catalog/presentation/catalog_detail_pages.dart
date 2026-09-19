@@ -1841,16 +1841,91 @@ final class _StoreAvatar extends StatelessWidget {
   );
 }
 
-final class StoreBannerStrip extends StatelessWidget {
+final class StoreBannerStrip extends StatefulWidget {
   const StoreBannerStrip({
     super.key,
     required this.banners,
     required this.title,
   });
+
   final List<StoreBanner> banners;
   final String title;
 
-  Future<void> _open(BuildContext context, StoreBanner banner) async {
+  @override
+  State<StoreBannerStrip> createState() => _StoreBannerStripState();
+}
+
+final class _StoreBannerStripState extends State<StoreBannerStrip>
+    with WidgetsBindingObserver {
+  final _controller = PageController(viewportFraction: .94);
+  Timer? _autoplay;
+  int _activeIndex = 0;
+  bool _isInteracting = false;
+  bool _reduceMotion = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion =
+        MediaQuery.of(context).disableAnimations ||
+        MediaQuery.of(context).accessibleNavigation;
+    _scheduleAutoplay();
+  }
+
+  @override
+  void didUpdateWidget(covariant StoreBannerStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.banners.length != widget.banners.length) {
+      _activeIndex = 0;
+      if (_controller.hasClients) _controller.jumpToPage(0);
+    }
+    _scheduleAutoplay();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _scheduleAutoplay();
+    } else {
+      _autoplay?.cancel();
+    }
+  }
+
+  void _scheduleAutoplay() {
+    _autoplay?.cancel();
+    if (!mounted ||
+        _isInteracting ||
+        _reduceMotion ||
+        widget.banners.length < 2 ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+    _autoplay = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && !_isInteracting) _goTo(_activeIndex + 1);
+    });
+  }
+
+  void _goTo(int requestedIndex) {
+    final count = widget.banners.length;
+    if (count < 2) return;
+    final next = requestedIndex % count;
+    if (_controller.hasClients) {
+      _controller.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 460),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (mounted) setState(() => _activeIndex = next);
+  }
+
+  Future<void> _open(StoreBanner banner) async {
     if (banner.destinationType == 'product' &&
         banner.destinationProductId != null) {
       Navigator.of(context).push(
@@ -1877,77 +1952,204 @@ final class StoreBannerStrip extends StatelessWidget {
         Uri.parse(banner.externalUrl!),
         mode: LaunchMode.externalApplication,
       );
+    } else if (banner.destinationType == 'phone' &&
+        banner.destinationPhone != null) {
+      await launchUrl(
+        Uri(scheme: 'tel', path: banner.destinationPhone!),
+        mode: LaunchMode.externalApplication,
+      );
+    } else if (banner.destinationType == 'whatsapp' &&
+        banner.destinationPhone != null) {
+      final number = banner.destinationPhone!.replaceAll(RegExp(r'[^0-9]'), '');
+      if (number.isNotEmpty) {
+        await launchUrl(
+          Uri.parse('https://wa.me/$number'),
+          mode: LaunchMode.externalApplication,
+        );
+      }
     }
   }
 
+  bool _onScroll(ScrollNotification notification) {
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _isInteracting = true;
+      _autoplay?.cancel();
+    } else if (notification is ScrollEndNotification && _isInteracting) {
+      _isInteracting = false;
+      _scheduleAutoplay();
+    }
+    return false;
+  }
+
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium
-            ?.copyWith(fontWeight: FontWeight.w900),
-      ),
-      const SizedBox(height: 9),
-      SizedBox(
-        height: 148,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: banners.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (context, index) {
-            final banner = banners[index];
-            return SizedBox(
-              width: 300,
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: () => _open(context, banner),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CachedMediaImage(
-                        mediaPublicId: banner.mediaPublicId,
-                        fit: BoxFit.cover,
-                      ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xB8000000), Color(0x00000000)],
-                            begin: AlignmentDirectional.bottomStart,
-                            end: AlignmentDirectional.topEnd,
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _autoplay?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.banners.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 29,
+              height: 29,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                size: 17,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              widget.title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 174,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _onScroll,
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: widget.banners.length,
+              onPageChanged: (index) {
+                if (mounted) setState(() => _activeIndex = index);
+              },
+              itemBuilder: (context, index) {
+                final banner = widget.banners[index];
+                return Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 10),
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    clipBehavior: Clip.antiAlias,
+                    elevation: 3,
+                    shadowColor: const Color(0x30105746),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(21),
+                    ),
+                    child: InkWell(
+                      onTap: () => _open(banner),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CachedMediaImage(
+                            mediaPublicId: banner.mediaPublicId,
+                            fit: BoxFit.cover,
                           ),
-                        ),
-                      ),
-                      if (banner.title?.isNotEmpty == true)
-                        PositionedDirectional(
-                          bottom: 12,
-                          start: 12,
-                          end: 12,
-                          child: Text(
-                            banner.title!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              shadows: [
-                                Shadow(blurRadius: 4, color: Colors.black),
-                              ],
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0xCC082D24),
+                                  Color(0x24082D24),
+                                  Color(0x00082D24),
+                                ],
+                                begin: AlignmentDirectional.bottomStart,
+                                end: AlignmentDirectional.topEnd,
+                                stops: [.04, .48, 1],
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                          if (banner.title?.isNotEmpty == true ||
+                              banner.body?.isNotEmpty == true)
+                            PositionedDirectional(
+                              start: 16,
+                              end: 16,
+                              bottom: 14,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (banner.title?.isNotEmpty == true)
+                                    Text(
+                                      banner.title!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w900,
+                                        shadows: [
+                                          Shadow(
+                                            blurRadius: 7,
+                                            color: Color(0xB0000000),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  if (banner.body?.isNotEmpty == true) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      banner.body!,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFFF1FFF9),
+                                        height: 1.3,
+                                        shadows: [
+                                          Shadow(
+                                            blurRadius: 6,
+                                            color: Color(0x96000000),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (widget.banners.length > 1) ...[
+          const SizedBox(height: 9),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              widget.banners.length,
+              (index) => GestureDetector(
+                onTap: () => _goTo(index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: _activeIndex == index ? 21 : 7,
+                  height: 7,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    color: _activeIndex == index
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(99),
                   ),
                 ),
               ),
-            );
-          },
-        ),
-      ),
-    ],
-  );
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 final class _OfferBadge extends StatelessWidget {

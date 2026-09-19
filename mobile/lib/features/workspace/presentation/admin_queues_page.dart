@@ -10,7 +10,9 @@ import '../data/workspace_repository.dart';
 /// Operational queues for decisions which must always be explicit. Manual
 /// payments are visible to administration but are final when the merchant decides.
 final class AdminQueuesPage extends StatefulWidget {
-  const AdminQueuesPage({super.key});
+  const AdminQueuesPage({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   State<AdminQueuesPage> createState() => _AdminQueuesPageState();
@@ -121,7 +123,9 @@ final class _AdminQueuesPageState extends State<AdminQueuesPage> {
   @override
   Widget build(BuildContext context) => DefaultTabController(
     length: 6,
-    child: Scaffold(
+    initialIndex: widget.initialTabIndex.clamp(0, 5).toInt(),
+    child: AdminWorkspaceScaffold(
+      active: AdminDestination.queues,
       appBar: AppBar(
         title: const Text('الطوابير الإدارية'),
         actions: [
@@ -136,12 +140,12 @@ final class _AdminQueuesPageState extends State<AdminQueuesPage> {
           'queues',
           const TabBar(
             isScrollable: true,
-          tabs: [
-            Tab(text: 'الدفعات'),
-            Tab(text: 'السحوبات'),
-            Tab(text: 'الدعم'),
-            Tab(text: 'البلاغات'),
-            Tab(text: 'النزاعات'),
+            tabs: [
+              Tab(text: 'الدفعات'),
+              Tab(text: 'السحوبات'),
+              Tab(text: 'الدعم'),
+              Tab(text: 'البلاغات'),
+              Tab(text: 'النزاعات'),
               Tab(text: 'الترويج'),
             ],
           ),
@@ -204,15 +208,19 @@ final class _AdminQueuesPageState extends State<AdminQueuesPage> {
     final hasReceipt = item['has_receipt'] == true;
     final paid = item['order_payment_status'] == 'paid';
     return _DecisionCard(
-      title: '${item['order_number'] ?? 'طلب'} — ${item['store_name'] ?? 'متجر'}',
+      title:
+          '${item['order_number'] ?? 'طلب'} — ${item['store_name'] ?? 'متجر'}',
       details: item,
       detailsTitle: 'سجل إشعار الدفع',
-      subtitle: '${paid ? 'تم الدفع' : item['payment_status'] ?? '—'} · ${item['amount'] ?? 0} ${item['currency_code'] ?? ''}${item['invoice_number'] != null ? ' · فاتورة ${item['invoice_number']}' : ''}',
+      subtitle:
+          '${paid ? 'تم الدفع' : item['payment_status'] ?? '—'} · ${item['amount'] ?? 0} ${item['currency_code'] ?? ''}${item['invoice_number'] != null ? ' · فاتورة ${item['invoice_number']}' : ''}',
       busy: false,
       actions: [
         if (hasReceipt && id.isNotEmpty)
           OutlinedButton.icon(
-            onPressed: () => _viewPrivateImage(() => AppScope.of(context).loadAdminPaymentReceipt(id)),
+            onPressed: () => _viewPrivateImage(
+              () => AppScope.of(context).loadAdminPaymentReceipt(id),
+            ),
             icon: const Icon(Icons.receipt_long_outlined),
             label: const Text('الإيصال'),
           ),
@@ -509,8 +517,13 @@ void _showQueueDetails(
     'updated_at': 'آخر تحديث',
   };
   final rows = item.entries
-      .where((entry) => entry.value != null && '${entry.value}'.trim().isNotEmpty)
-      .map((entry) => (label: labels[entry.key] ?? entry.key, value: '${entry.value}'))
+      .where(
+        (entry) => entry.value != null && '${entry.value}'.trim().isNotEmpty,
+      )
+      .map(
+        (entry) =>
+            (label: labels[entry.key] ?? entry.key, value: '${entry.value}'),
+      )
       .toList(growable: false);
   showModalBottomSheet<void>(
     context: context,
@@ -535,11 +548,20 @@ void _showQueueDetails(
               ),
             ),
             const SizedBox(height: 16),
-            Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 12),
-            ...rows.map((row) => Card(
-              child: ListTile(title: Text(row.label), subtitle: SelectableText(row.value)),
-            )),
+            ...rows.map(
+              (row) => Card(
+                child: ListTile(
+                  title: Text(row.label),
+                  subtitle: SelectableText(row.value),
+                ),
+              ),
+            ),
           ],
         ),
       ),

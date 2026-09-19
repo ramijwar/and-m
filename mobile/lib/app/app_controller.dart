@@ -76,6 +76,7 @@ final class AppController extends ChangeNotifier {
   HomeFeed feed = const HomeFeed(stores: [], listings: []);
   List<ShoppingCart> carts = const [];
   List<StoreSummary> storeDirectory = const [];
+  List<StoreBanner> storeDirectoryBanners = const [];
   String storeDirectoryMode = '';
   bool isStoreDirectoryLoading = false;
   String? storeDirectoryError;
@@ -159,11 +160,12 @@ final class AppController extends ChangeNotifier {
     storeDirectoryError = null;
     notifyListeners();
     try {
-      final stores = await _catalogRepository.loadStoreDirectory(
+      final directory = await _catalogRepository.loadStoreDirectory(
         mode: normalizedMode,
       );
       if (revision != _storeDirectoryRevision) return;
-      storeDirectory = stores;
+      storeDirectory = directory.items;
+      storeDirectoryBanners = directory.banners;
     } on ApiException catch (error) {
       if (revision != _storeDirectoryRevision) return;
       storeDirectoryError = error.message;
@@ -1189,6 +1191,17 @@ final class AppController extends ChangeNotifier {
       admin
       ? _workspaceRepository.adminStoreHomeBanners()
       : _workspaceRepository.merchantStoreBanners();
+
+  Future<List<Map<String, dynamic>>> searchStoreBannerTargets({
+    required bool admin,
+    required String type,
+    String search = '',
+  }) => _workspaceRepository.searchStoreBannerTargets(
+    admin: admin,
+    type: type,
+    search: search,
+  );
+
   Future<void> saveStoreBanner({
     required bool admin,
     String? bannerId,

@@ -83,19 +83,46 @@ final class StoreSummary {
     allowsPreorder: json['allows_preorder'] == true,
     isWeeklyMostVisited: json['is_weekly_most_visited'] == true,
     isBestSeller: json['is_best_seller'] == true,
-    viewCount: (json['view_count'] as num?)?.toInt() ?? int.tryParse('${json['view_count'] ?? ''}') ?? 0,
-    salesCount: (json['sales_count'] as num?)?.toInt() ?? int.tryParse('${json['sales_count'] ?? ''}') ?? 0,
+    viewCount:
+        (json['view_count'] as num?)?.toInt() ??
+        int.tryParse('${json['view_count'] ?? ''}') ??
+        0,
+    salesCount:
+        (json['sales_count'] as num?)?.toInt() ??
+        int.tryParse('${json['sales_count'] ?? ''}') ??
+        0,
     isFollowing: json['is_following'] == true,
-    productCount: (json['product_count'] as num?)?.toInt() ?? int.tryParse('${json['product_count'] ?? ''}') ?? 0,
-    verificationStatus: json['verification_status'] as String? ?? 'not_submitted',
+    productCount:
+        (json['product_count'] as num?)?.toInt() ??
+        int.tryParse('${json['product_count'] ?? ''}') ??
+        0,
+    verificationStatus:
+        json['verification_status'] as String? ?? 'not_submitted',
     whatsappPhone: json['whatsapp_phone'] as String?,
     phone: json['phone'] as String?,
-    businessHours: json['business_hours'] is Map ? Map<String, dynamic>.from(json['business_hours'] as Map) : const {},
-    holidays: (json['holidays'] as List? ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList(growable: false),
-    followerCount: (json['follower_count'] as num?)?.toInt() ?? int.tryParse('${json['follower_count'] ?? ''}') ?? 0,
-    reviewCount: (json['review_count'] as num?)?.toInt() ?? int.tryParse('${json['review_count'] ?? ''}') ?? 0,
-    averageRating: (json['average_rating'] as num?) ?? num.tryParse('${json['average_rating'] ?? ''}') ?? 0,
-    weeklyVisitCount: (json['weekly_visit_count'] as num?)?.toInt() ?? int.tryParse('${json['weekly_visit_count'] ?? ''}') ?? 0,
+    businessHours: json['business_hours'] is Map
+        ? Map<String, dynamic>.from(json['business_hours'] as Map)
+        : const {},
+    holidays: (json['holidays'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false),
+    followerCount:
+        (json['follower_count'] as num?)?.toInt() ??
+        int.tryParse('${json['follower_count'] ?? ''}') ??
+        0,
+    reviewCount:
+        (json['review_count'] as num?)?.toInt() ??
+        int.tryParse('${json['review_count'] ?? ''}') ??
+        0,
+    averageRating:
+        (json['average_rating'] as num?) ??
+        num.tryParse('${json['average_rating'] ?? ''}') ??
+        0,
+    weeklyVisitCount:
+        (json['weekly_visit_count'] as num?)?.toInt() ??
+        int.tryParse('${json['weekly_visit_count'] ?? ''}') ??
+        0,
     addressCountryCode: json['address_country_code'] as String?,
     addressCity: json['address_city'] as String?,
     addressDistrict: json['address_district'] as String?,
@@ -221,8 +248,12 @@ final class MarketplaceListing {
         addressText: json['address_text'] as String?,
         phone: json['phone'] as String?,
         listingType: json['listing_type'] as String?,
-        isNegotiable: json['is_negotiable'] == true || json['is_negotiable'] == 1,
-        isFavorite: json['is_favorite'] == true || json['is_favorite'] == 1 || json['is_favorite'] == '1',
+        isNegotiable:
+            json['is_negotiable'] == true || json['is_negotiable'] == 1,
+        isFavorite:
+            json['is_favorite'] == true ||
+            json['is_favorite'] == 1 ||
+            json['is_favorite'] == '1',
         listingStatus: json['listing_status'] as String?,
         publishedAt: json['published_at'] as String?,
         expiresAt: json['expires_at'] as String?,
@@ -310,16 +341,29 @@ final class StoreProduct {
   final int? preorderLeadDays;
   final String? storeName;
   final num? storeAverageRating;
-  static num _number(Object? value, [num fallback = 0]) => value is num ? value : num.tryParse('${value ?? ''}') ?? fallback;
-  static num? _nullableNumber(Object? value) { if (value == null || '$value'.trim().isEmpty) return null; return value is num ? value : num.tryParse('$value'); }
-  static int? _nullableInteger(Object? value) { final number = _nullableNumber(value); return number?.toInt(); }
+  static num _number(Object? value, [num fallback = 0]) =>
+      value is num ? value : num.tryParse('${value ?? ''}') ?? fallback;
+  static num? _nullableNumber(Object? value) {
+    if (value == null || '$value'.trim().isEmpty) return null;
+    return value is num ? value : num.tryParse('$value');
+  }
+
+  static int? _nullableInteger(Object? value) {
+    final number = _nullableNumber(value);
+    return number?.toInt();
+  }
 
   bool get isActiveSpecialOffer {
-    if (!isSpecialOffer || salePrice == null || saleEndsAt == null) return false;
+    if (!isSpecialOffer || salePrice == null || saleEndsAt == null)
+      return false;
     final now = DateTime.now();
     final ending = DateTime.tryParse(saleEndsAt!);
-    final starting = saleStartsAt == null ? null : DateTime.tryParse(saleStartsAt!);
-    return ending != null && ending.isAfter(now) && (starting == null || !starting.isAfter(now));
+    final starting = saleStartsAt == null
+        ? null
+        : DateTime.tryParse(saleStartsAt!);
+    return ending != null &&
+        ending.isAfter(now) &&
+        (starting == null || !starting.isAfter(now));
   }
 
   factory StoreProduct.fromJson(Map<String, dynamic> json) => StoreProduct(
@@ -347,7 +391,10 @@ final class StoreProduct {
     salePrice: _nullableNumber(json['sale_price']),
     saleStartsAt: json['sale_starts_at'] as String?,
     saleEndsAt: json['sale_ends_at'] as String?,
-    isSpecialOffer: json['is_special_offer'] == true || json['is_special_offer'] == 1 || json['is_special_offer'] == '1',
+    isSpecialOffer:
+        json['is_special_offer'] == true ||
+        json['is_special_offer'] == 1 ||
+        json['is_special_offer'] == '1',
     fulfillmentMode: json['fulfillment_mode'] as String? ?? 'retail',
     preorderMinQuantity: _nullableInteger(json['preorder_min_quantity']),
     preorderMaxQuantity: _nullableInteger(json['preorder_max_quantity']),
@@ -430,9 +477,37 @@ final class ProductDetails {
 }
 
 final class StoreBanner {
-  const StoreBanner({required this.publicId, required this.mediaPublicId, required this.destinationType, this.title, this.body, this.destinationProductId, this.destinationStoreId, this.externalUrl});
-  final String publicId; final String mediaPublicId; final String destinationType; final String? title; final String? body; final String? destinationProductId; final String? destinationStoreId; final String? externalUrl;
-  factory StoreBanner.fromJson(Map<String, dynamic> json) => StoreBanner(publicId: json['public_id'] as String? ?? '', mediaPublicId: json['media_public_id'] as String? ?? '', destinationType: json['destination_type'] as String? ?? 'none', title: json['title'] as String?, body: json['body'] as String?, destinationProductId: json['destination_product_id'] as String?, destinationStoreId: json['destination_store_id'] as String?, externalUrl: json['external_url'] as String?);
+  const StoreBanner({
+    required this.publicId,
+    required this.mediaPublicId,
+    required this.destinationType,
+    this.title,
+    this.body,
+    this.destinationProductId,
+    this.destinationStoreId,
+    this.externalUrl,
+    this.destinationPhone,
+  });
+  final String publicId;
+  final String mediaPublicId;
+  final String destinationType;
+  final String? title;
+  final String? body;
+  final String? destinationProductId;
+  final String? destinationStoreId;
+  final String? externalUrl;
+  final String? destinationPhone;
+  factory StoreBanner.fromJson(Map<String, dynamic> json) => StoreBanner(
+    publicId: json['public_id'] as String? ?? '',
+    mediaPublicId: json['media_public_id'] as String? ?? '',
+    destinationType: json['destination_type'] as String? ?? 'none',
+    title: json['title'] as String?,
+    body: json['body'] as String?,
+    destinationProductId: json['destination_product_id'] as String?,
+    destinationStoreId: json['destination_store_id'] as String?,
+    externalUrl: json['external_url'] as String?,
+    destinationPhone: json['destination_phone'] as String?,
+  );
 }
 
 final class StoreDetails {
@@ -464,12 +539,13 @@ final class ListingAttribute {
   final String value;
   final String fieldType;
 
-  factory ListingAttribute.fromJson(Map<String, dynamic> json) => ListingAttribute(
-    publicId: json['public_id'] as String? ?? '',
-    label: json['label'] as String? ?? 'خاصية الإعلان',
-    value: json['value']?.toString() ?? '',
-    fieldType: json['field_type'] as String? ?? 'text',
-  );
+  factory ListingAttribute.fromJson(Map<String, dynamic> json) =>
+      ListingAttribute(
+        publicId: json['public_id'] as String? ?? '',
+        label: json['label'] as String? ?? 'خاصية الإعلان',
+        value: json['value']?.toString() ?? '',
+        fieldType: json['field_type'] as String? ?? 'text',
+      );
 }
 
 final class ListingDetails {
@@ -492,12 +568,14 @@ final class HomeFeed {
   const HomeFeed({
     required this.stores,
     required this.listings,
+    this.banners = const [],
     this.isStale = false,
     this.lastSyncedAt,
   });
 
   final List<StoreSummary> stores;
   final List<MarketplaceListing> listings;
+  final List<StoreBanner> banners;
   final bool isStale;
   final DateTime? lastSyncedAt;
 }

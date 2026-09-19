@@ -4,17 +4,7 @@ import '../../../app/app_scope.dart';
 import '../../../core/media/cached_media_image.dart';
 import '../../../core/network/api_exception.dart';
 import '../data/workspace_repository.dart';
-import 'admin_catalog_page.dart';
-import 'admin_commerce_page.dart';
-import 'admin_activity_page.dart';
-import 'admin_delivery_page.dart';
-import 'admin_finance_page.dart';
-import 'admin_control_strip.dart';
-import 'admin_marketplace_listings_page.dart';
-import 'admin_support_tickets_page.dart';
-import 'admin_operations_page.dart';
-import 'admin_queues_page.dart';
-import 'admin_users_page.dart';
+import 'admin_navigation.dart';
 import 'store_banner_management_page.dart';
 import 'store_settings_page.dart';
 
@@ -250,10 +240,17 @@ final class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AdminWorkspaceScaffold(
+    active: AdminDestination.dashboard,
     appBar: AppBar(
-      title: const Text('لوحة الإدارة'),
+      title: const Text('مركز التحكم'),
       actions: [
+        IconButton(
+          tooltip: 'الحملات والإشعارات',
+          onPressed: () =>
+              openAdminDestination(context, AdminDestination.campaigns),
+          icon: const Icon(Icons.campaign_outlined),
+        ),
         IconButton(
           tooltip: 'بنرات دليل المتاجر',
           onPressed: () => Navigator.of(context).push(
@@ -269,49 +266,6 @@ final class _AdminDashboardPageState extends State<AdminDashboardPage> {
           icon: const Icon(Icons.refresh_rounded),
         ),
       ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(62),
-        child: AdminControlStrip(
-          active: 'dashboard',
-          onDashboard: () {},
-          onUsers: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const AdminUsersPage()),
-          ),
-          onQueues: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const AdminQueuesPage()),
-          ),
-          onCommerce: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const AdminCommercePage()),
-          ),
-          onCatalog: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const AdminCatalogPage()),
-          ),
-          onMarketplace: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const AdminMarketplaceListingsPage(),
-            ),
-          ),
-          onSupport: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const AdminSupportTicketsPage(),
-            ),
-          ),
-          onDelivery: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const AdminDeliveryPage()),
-          ),
-          onFinance: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const AdminFinancePage()),
-          ),
-          onActivity: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const AdminActivityPage()),
-          ),
-          onOperations: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const AdminOperationsPage(),
-            ),
-          ),
-        ),
-      ),
     ),
     body: FutureBuilder<AdminWorkspace>(
       future: _future,
@@ -352,10 +306,12 @@ final class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
             children: [
-              _SummaryCard(
+              _AdminCommandHeader(
                 stores: data.stores.length,
                 listings: pendingListings.length,
                 verifications: data.verifications.length,
+                onOpen: (destination) =>
+                    openAdminDestination(context, destination),
               ),
               const SizedBox(height: 20),
               _Section(
@@ -490,41 +446,189 @@ final class _AdminDashboardPageState extends State<AdminDashboardPage> {
   };
 }
 
-final class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+final class _AdminCommandHeader extends StatelessWidget {
+  const _AdminCommandHeader({
     required this.stores,
     required this.listings,
     required this.verifications,
+    required this.onOpen,
   });
+
   final int stores;
   final int listings;
   final int verifications;
+  final ValueChanged<AdminDestination> onOpen;
 
   @override
-  Widget build(BuildContext context) => Card(
-    color: Theme.of(context).colorScheme.primaryContainer.withOpacity(.42),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(19),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(24),
+      gradient: const LinearGradient(
+        begin: Alignment.topRight,
+        end: Alignment.bottomLeft,
+        colors: [Color(0xFF083F75), Color(0xFF1478D4)],
+      ),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x3D1769B0),
+          blurRadius: 24,
+          offset: Offset(0, 11),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'لوحة تحكم تجارتي',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'القرارات والحركة التشغيلية في مكان واحد',
+                    style: TextStyle(
+                      color: Color(0xFFD9EEFF),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: Color(0x33FFFFFF),
+              child: Icon(
+                Icons.admin_panel_settings_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 17),
+        Row(
+          children: [
+            _metric('$stores', 'متجر نشط', Icons.storefront_rounded),
+            const SizedBox(width: 8),
+            _metric('$listings', 'مراجعة حراج', Icons.fact_check_outlined),
+            const SizedBox(width: 8),
+            _metric(
+              '$verifications',
+              'توثيق معلق',
+              Icons.verified_user_outlined,
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          'اختصارات الإدارة',
+          style: TextStyle(
+            color: Color(0xFFE8F5FF),
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _action(
+              label: 'الطوابير',
+              icon: Icons.rule_folder_outlined,
+              onTap: () => onOpen(AdminDestination.queues),
+            ),
+            _action(
+              label: 'الحملات',
+              icon: Icons.campaign_outlined,
+              onTap: () => onOpen(AdminDestination.campaigns),
+            ),
+            _action(
+              label: 'المستخدمون',
+              icon: Icons.manage_accounts_outlined,
+              onTap: () => onOpen(AdminDestination.users),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  Widget _metric(String value, String label, IconData icon) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0x1FFFFFFF),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0x2CFFFFFF)),
+      ),
+      child: Column(
         children: [
-          _stat(context, '$verifications', 'توثيق'),
-          _stat(context, '$stores', 'متاجر'),
-          _stat(context, '$listings', 'إعلانات'),
+          Icon(icon, size: 18, color: const Color(0xFFD8EEFF)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFFDCEEFF),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     ),
   );
 
-  Widget _stat(BuildContext context, String number, String label) => Expanded(
-    child: Column(
-      children: [
-        Text(
-          number,
-          style: Theme.of(context).textTheme.headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w900),
+  Widget _action({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) => Material(
+    color: const Color(0x1AFFFFFF),
+    borderRadius: BorderRadius.circular(13),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(11, 8, 12, 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 17, color: Colors.white),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
-        Text(label),
-      ],
+      ),
     ),
   );
 }

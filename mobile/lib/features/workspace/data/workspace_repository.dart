@@ -861,6 +861,20 @@ final class WorkspaceRepository {
       _mapItems(await _api.get('/merchant/store/banners'));
   Future<List<Map<String, dynamic>>> adminStoreHomeBanners() async =>
       _mapItems(await _api.get('/admin/store-home-banners'));
+
+  Future<List<Map<String, dynamic>>> searchStoreBannerTargets({
+    required bool admin,
+    required String type,
+    String search = '',
+  }) async {
+    final query = <String, String>{'type': type, 'per_page': '12'};
+    if (search.trim().isNotEmpty) query['search'] = search.trim();
+    final path = admin
+        ? '/admin/store-banner-targets'
+        : '/merchant/store/banner-targets';
+    return _mapItems(await _api.get(path, query: query));
+  }
+
   Future<void> saveStoreBanner({
     required bool admin,
     String? bannerId,

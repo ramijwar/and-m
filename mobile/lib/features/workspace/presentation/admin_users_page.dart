@@ -87,7 +87,8 @@ final class _AdminUsersPageState extends State<AdminUsersPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AdminWorkspaceScaffold(
+    active: AdminDestination.users,
     appBar: AppBar(
       title: const Text('إدارة المستخدمين'),
       actions: [

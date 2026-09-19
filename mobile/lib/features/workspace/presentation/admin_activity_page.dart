@@ -4,13 +4,16 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_scope.dart';
 import '../../../core/network/api_exception.dart';
+import '../../notifications/presentation/notification_preferences_page.dart';
 import 'admin_navigation.dart';
-import 'admin_notification_campaign_page.dart';
 
 /// Immutable operational trace: administrative audit actions and outgoing
 /// notification / FCM records. It intentionally provides no delete or edit.
 final class AdminActivityPage extends StatefulWidget {
-  const AdminActivityPage({super.key});
+  const AdminActivityPage({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
+
   @override
   State<AdminActivityPage> createState() => _AdminActivityPageState();
 }
@@ -28,7 +31,11 @@ final class _AdminActivityPageState extends State<AdminActivityPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(
+      length: 3,
+      initialIndex: widget.initialTabIndex.clamp(0, 2).toInt(),
+      vsync: this,
+    );
     _reload();
   }
 
@@ -55,18 +62,25 @@ final class _AdminActivityPageState extends State<AdminActivityPage>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AdminWorkspaceScaffold(
+    active: AdminDestination.activity,
     appBar: AppBar(
       title: const Text('سجل النشاط والإشعارات'),
       bottom: adminControlBottom(context, 'activity'),
       actions: [
         IconButton(
-          tooltip: 'إرسال إشعار إداري',
+          tooltip: 'إعدادات إشعاراتي',
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => const AdminNotificationCampaignPage(),
+              builder: (_) => const NotificationPreferencesPage(),
             ),
           ),
+          icon: const Icon(Icons.tune_rounded),
+        ),
+        IconButton(
+          tooltip: 'الحملات والإشعارات',
+          onPressed: () =>
+              openAdminDestination(context, AdminDestination.campaigns),
           icon: const Icon(Icons.campaign_outlined),
         ),
         IconButton(onPressed: _reload, icon: const Icon(Icons.refresh_rounded)),
@@ -267,8 +281,15 @@ final class _AdminActivityPageState extends State<AdminActivityPage>
     builder: (context, s) {
       if (s.connectionState != ConnectionState.done)
         return const Center(child: CircularProgressIndicator());
-      if (s.hasError)
-        return const Center(child: Text('تعذر تحميل سجل الإشعارات.'));
+      if (s.hasError) {
+        final error = s.error is ApiException
+            ? (s.error as ApiException)
+            : null;
+        return _tabFailure(
+          message: error?.message ?? 'تعذر تحميل سجل الإشعارات.',
+          requestId: error?.requestId,
+        );
+      }
       final base = _filter(s.data ?? const []);
       final rows = base
           .where(
@@ -390,6 +411,35 @@ final class _AdminActivityPageState extends State<AdminActivityPage>
       );
     },
   );
+  Widget _tabFailure({required String message, String? requestId}) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 38),
+              const SizedBox(height: 10),
+              Text(message, textAlign: TextAlign.center),
+              if (requestId?.isNotEmpty == true) ...[
+                const SizedBox(height: 5),
+                Text('رمز المتابعة: $requestId'),
+              ],
+              const SizedBox(height: 13),
+              OutlinedButton.icon(
+                onPressed: _reload,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
   String _merchantCampaignStatus(Map<String, dynamic> campaign) =>
       switch (campaign['campaign_status']) {
         'approved' => 'نجحت الحملة',

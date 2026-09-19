@@ -313,7 +313,8 @@ final class _AdminOperationsPageState extends State<AdminOperationsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AdminWorkspaceScaffold(
+    active: AdminDestination.operations,
     appBar: AppBar(
       title: const Text('سياسات ورسوم المنصة'),
       bottom: adminControlBottom(context, 'operations'),
@@ -347,7 +348,9 @@ final class _AdminOperationsPageState extends State<AdminOperationsPage> {
                   const ListTile(
                     leading: Icon(Icons.storefront_outlined),
                     title: Text('تنشيط المتاجر بواسطة صاحب المتجر'),
-                    subtitle: Text('لا توجد موافقة إدارية على إنشاء المتجر؛ التوثيق منفصل داخل إدارة المتاجر.'),
+                    subtitle: Text(
+                      'لا توجد موافقة إدارية على إنشاء المتجر؛ التوثيق منفصل داخل إدارة المتاجر.',
+                    ),
                   ),
                   const Divider(height: 1),
                   SwitchListTile.adaptive(
