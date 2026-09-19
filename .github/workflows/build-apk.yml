@@ -128,6 +128,7 @@ jobs:
         run: |
           # Remove stale local.properties so Flutter SDK path is generated freshly for CI runner
           find . -name "local.properties" -exec rm -f {} +
+          rm -f local.properties android/local.properties
 
           # Ensure Gradle heap limit stays within GitHub Actions runner memory (7GB)
           find . -name "gradle.properties" -exec sed -i 's/-Xmx[0-9]*[Gg]/-Xmx3072m/g' {} +
@@ -148,7 +149,21 @@ jobs:
         run: flutter test --no-pub
         continue-on-error: true
 
+      - name: Analyze Flutter project
+        working-directory: ${{ steps.locate_flutter.outputs.project_dir }}
+        run: |
+          echo "=== فحص الكود المصدري ==="
+          flutter analyze --no-pub > /tmp/flutter_analyze.log 2>&1 || true
+          cat /tmp/flutter_analyze.log
+          if grep -i "error •" /tmp/flutter_analyze.log; then
+            echo "### ⚠️ أخطاء التحليل المصدري:" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            grep -i "error •" /tmp/flutter_analyze.log | head -n 40 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Build Android APK
+        id: build_apk
         working-directory: ${{ steps.locate_flutter.outputs.project_dir }}
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError'"
@@ -160,10 +175,15 @@ jobs:
           fi
 
           echo "Starting Flutter APK build with mode: $BUILD_MODE $SPLIT_FLAG"
-          if [ "$BUILD_MODE" = "debug" ]; then
-            flutter build apk --debug $SPLIT_FLAG
-          else
-            flutter build apk --release $SPLIT_FLAG
+          set -o pipefail
+          BUILD_CMD="flutter build apk --$BUILD_MODE $SPLIT_FLAG -v"
+          echo "Running build command: $BUILD_CMD"
+          if ! $BUILD_CMD 2>&1 | tee /tmp/flutter_build.log; then
+            echo "### ❌ سجل خطأ بناء الـ APK:" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            tail -n 120 /tmp/flutter_build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
 
       - name: List and verify generated APKs
